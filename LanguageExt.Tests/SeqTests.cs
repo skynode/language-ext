@@ -55,7 +55,7 @@ namespace LanguageExt.Tests
         {
             IEnumerable<int> Numbers()
             {
-                for (int i = 0; i < Int32.MaxValue; i++)
+                for (int i = 0; i < 100; i++)
                 {
                     yield return i;
                 }
@@ -162,8 +162,8 @@ namespace LanguageExt.Tests
         [Fact]
         public void EqualityTest_BothNull()
         {
-            Seq<int> x = null;
-            Seq<int> y = null;
+            Seq<int> x = default;
+            Seq<int> y = default;
 
             var eq = x == y;
 
@@ -173,7 +173,7 @@ namespace LanguageExt.Tests
         [Fact]
         public void EqualityTest_LeftNull()
         {
-            Seq<int> x = null;
+            Seq<int> x = default;
             Seq<int> y = Seq(1, 2, 3);
 
             var eq = x == y;
@@ -185,7 +185,7 @@ namespace LanguageExt.Tests
         public void EqualityTest_RightNull()
         {
             Seq<int> x = Seq(1, 2, 3);
-            Seq<int> y = null;
+            Seq<int> y = default;
 
             var eq = x == y;
 
@@ -238,6 +238,36 @@ namespace LanguageExt.Tests
             var eq = res1 == res2;
 
             Assert.True(eq);
+        }
+
+        [Fact]
+        public void AddTest()
+        {
+            var a = Seq1("a");
+
+            var b = a.Add("b");
+
+            var c = a.Add("c");
+
+            Assert.Equal("a", string.Join("|", a));
+            Assert.Equal("a|b", string.Join("|", b));
+            Assert.Equal("a|c", string.Join("|", c));
+
+        }
+
+        [Fact]
+        public void ConsTest()
+        {
+            var a = Seq1("a");
+
+            var b = "b".Cons(a);
+
+            var c = "c".Cons(a);
+
+            Assert.Equal("a", string.Join("|", a));
+            Assert.Equal("b|a", string.Join("|", b));
+            Assert.Equal("c|a", string.Join("|", c));
+
         }
     }
 }

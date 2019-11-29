@@ -9,6 +9,7 @@ using LanguageExt.TypeClasses;
 using System.Collections.Generic;
 using LanguageExt.ClassInstances;
 using LanguageExt.DataTypes.Serialisation;
+using LanguageExt.Common;
 
 /// <summary>
 /// Extension methods for the TryOptionAsync monad
@@ -1106,8 +1107,18 @@ public static class TryOptionAsyncExtensions
             Fail: ex => EitherUnsafe<L, Option<A>>.Left(Fail(ex)));
 
     [Pure]
-    public static TryAsync<A> ToTry<A>(this TryOptionAsync<A> self) =>
-        async () => (await self.Try()).ToResult();
+    public static TryAsync<Option<A>> ToTry<A>(this TryOptionAsync<A> self) => () =>
+        self.Match(
+            Some: x => new Result<Option<A>>(Option<A>.Some(x)),
+            None: () => new Result<Option<A>>(Option<A>.None),
+            Fail: ex => new Result<Option<A>>(ex));
+
+    [Pure]
+    public static TryAsync<A> ToTry<A>(this TryOptionAsync<A> self, Func<A> None) => () =>
+        self.Match(
+            Some: x => new Result<A>(x),
+            None: () => new Result<A>(None()),
+            Fail: ex => new Result<A>(ex));
 
     [Pure]
     public static async Task<A> IfFailThrow<A>(this TryOptionAsync<A> self)

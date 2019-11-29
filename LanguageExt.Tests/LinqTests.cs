@@ -6,7 +6,7 @@ using static LanguageExt.Prelude;
 using static LanguageExt.TypeClass;
 using LanguageExt.ClassInstances;
 
-namespace LanguageExtTests
+namespace LanguageExt.Tests
 {
     
     public class LinqTests
@@ -167,6 +167,16 @@ namespace LanguageExtTests
                       select v * r;
 
             Assert.True(res.Count() == 0);
+        }
+
+        [Fact]
+        public void WhereArrayTest()
+        {
+            var res1 = from v in Array(1, 2, 3, 4, 5)
+                       where v < 3
+                       select v;
+
+            Assert.True(res1.Count == 2);
         }
 
         [Fact]

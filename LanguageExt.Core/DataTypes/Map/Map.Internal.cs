@@ -113,6 +113,18 @@ namespace LanguageExt
         public int Length =>
             Count;
 
+        [Pure]
+        public Option<(K, V)> Min => 
+            Root.IsEmpty
+                ? None
+                : MapModule.Min(Root);
+
+        [Pure]
+        public Option<(K, V)> Max => 
+            Root.IsEmpty
+                ? None
+                : MapModule.Max(Root);
+
         /// <summary>
         /// Get the hash code of all items in the map
         /// </summary>
@@ -459,6 +471,39 @@ namespace LanguageExt
                 : match(MapModule.TryFind<OrdK, K, V>(Root, key), Some, None);
 
         /// <summary>
+        /// Retrieve the value from predecessor item to specified key
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<(K, V)> FindPredecessor(K key) => MapModule.TryFindPredecessor<OrdK, K, V>(Root, key);
+
+        /// <summary>
+        /// Retrieve the value from exact key, or if not found, the predecessor item 
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<(K, V)> FindOrPredecessor(K key) => MapModule.TryFindOrPredecessor<OrdK, K, V>(Root, key);
+
+        /// <summary>
+        /// Retrieve the value from next item to specified key
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<(K, V)> FindSuccessor(K key) => MapModule.TryFindSuccessor<OrdK, K, V>(Root, key);
+
+        /// <summary>
+        /// Retrieve the value from exact key, or if not found, the next item 
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<(K, V)> FindOrSuccessor(K key) => MapModule.TryFindOrSuccessor<OrdK, K, V>(Root, key);
+
+
+        /// <summary>
         /// Try to find the key in the map, if it doesn't exist, add a new 
         /// item by invoking the delegate provided.
         /// </summary>
@@ -667,6 +712,23 @@ namespace LanguageExt
             return default(OrdK).Compare(keyFrom, keyTo) > 0
                 ? MapModule.FindRange<OrdK, K, V>(Root, keyTo, keyFrom)
                 : MapModule.FindRange<OrdK, K, V>(Root, keyFrom, keyTo);
+        }
+
+        /// <summary>
+        /// Retrieve a range of values 
+        /// </summary>
+        /// <param name="keyFrom">Range start (inclusive)</param>
+        /// <param name="keyTo">Range to (inclusive)</param>
+        /// <exception cref="ArgumentNullException">Throws ArgumentNullException the keyFrom or keyTo are null</exception>
+        /// <returns>Range of values</returns>
+        [Pure]
+        public IEnumerable<(K, V)> FindRangePairs(K keyFrom, K keyTo)
+        {
+            if (isnull(keyFrom)) throw new ArgumentNullException(nameof(keyFrom));
+            if (isnull(keyTo)) throw new ArgumentNullException(nameof(keyTo));
+            return default(OrdK).Compare(keyFrom, keyTo) > 0
+                ? MapModule.FindRangePairs<OrdK, K, V>(Root, keyTo, keyFrom)
+                : MapModule.FindRangePairs<OrdK, K, V>(Root, keyFrom, keyTo);
         }
 
         /// <summary>
@@ -1850,6 +1912,45 @@ namespace LanguageExt
             }
         }
 
+        /// <summary>
+        /// TODO: I suspect this is suboptimal, it would be better with a custom Enumerator 
+        /// that maintains a stack of nodes to retrace.
+        /// </summary>
+        public static IEnumerable<(K, V)> FindRangePairs<OrdK, K, V>(MapItem<K, V> node, K a, K b)
+            where OrdK : struct, Ord<K>
+        {
+            if (node.IsEmpty)
+            {
+                yield break;
+            }
+            if (default(OrdK).Compare(node.KeyValue.Key, a) < 0)
+            {
+                foreach (var item in FindRangePairs<OrdK, K, V>(node.Right, a, b))
+                {
+                    yield return item;
+                }
+            }
+            else if (default(OrdK).Compare(node.KeyValue.Key, b) > 0)
+            {
+                foreach (var item in FindRangePairs<OrdK, K, V>(node.Left, a, b))
+                {
+                    yield return item;
+                }
+            }
+            else
+            {
+                foreach (var item in FindRangePairs<OrdK, K, V>(node.Left, a, b))
+                {
+                    yield return item;
+                }
+                yield return node.KeyValue;
+                foreach (var item in FindRangePairs<OrdK, K, V>(node.Right, a, b))
+                {
+                    yield return item;
+                }
+            }
+        }
+
         public static Option<V> TryFind<OrdK, K, V>(MapItem<K, V> node, K key)
             where OrdK : struct, Ord<K>
         {
@@ -1943,5 +2044,162 @@ namespace LanguageExt
             node.IsEmpty || node.Right.IsEmpty
                 ? node
                 : RotLeft(Make(node.KeyValue, node.Left, RotRight(node.Right)));
+
+        internal static Option<(K, V)> Max<K, V>(MapItem<K, V> node) =>
+            node.Right.IsEmpty
+                ? node.KeyValue
+                : Max(node.Right);
+
+        internal static Option<(K, V)> Min<K, V>(MapItem<K, V> node) =>
+            node.Left.IsEmpty
+                ? node.KeyValue
+                : Min(node.Left);
+
+        internal static Option<(K, V)> TryFindPredecessor<OrdK, K, V>(MapItem<K, V> root, K key) where OrdK : struct, Ord<K>
+        {
+            Option<(K, V)> predecessor = None;
+            var current = root;
+
+            if (root.IsEmpty)
+            {
+                return None;
+            }
+
+            do
+            {
+                var cmp = default(OrdK).Compare(key, current.KeyValue.Key);
+                if (cmp < 0)
+                {
+                    current = current.Left;
+                }
+                else if (cmp > 0)
+                {
+                    predecessor = current.KeyValue;
+                    current = current.Right;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            while (!current.IsEmpty);
+
+            if (!current.IsEmpty && !current.Left.IsEmpty)
+            {
+                predecessor = Max(current.Left);
+            }
+
+            return predecessor;
+        }
+
+        internal static Option<(K, V)> TryFindOrPredecessor<OrdK, K, V>(MapItem<K, V> root, K key) where OrdK : struct, Ord<K>
+        {
+            Option<(K, V)> predecessor = None;
+            var current = root;
+
+            if (root.IsEmpty)
+            {
+                return None;
+            }
+
+            do
+            {
+                var cmp = default(OrdK).Compare(key, current.KeyValue.Key);
+                if (cmp < 0)
+                {
+                    current = current.Left;
+                }
+                else if (cmp > 0)
+                {
+                    predecessor = current.KeyValue;
+                    current = current.Right;
+                }
+                else
+                {
+                    return current.KeyValue;
+                }
+            }
+            while (!current.IsEmpty);
+
+            if (!current.IsEmpty && !current.Left.IsEmpty)
+            {
+                predecessor = Max(current.Left);
+            }
+
+            return predecessor;
+        }
+
+        internal static Option<(K, V)> TryFindSuccessor<OrdK, K, V>(MapItem<K, V> root, K key) where OrdK : struct, Ord<K>
+        {
+            Option<(K, V)> successor = None;
+            var current = root;
+
+            if (root.IsEmpty)
+            {
+                return None;
+            }
+
+            do
+            {
+                var cmp = default(OrdK).Compare(key, current.KeyValue.Key);
+                if (cmp < 0)
+                {
+                    successor = current.KeyValue;
+                    current = current.Left;
+                }
+                else if (cmp > 0)
+                {
+                    current = current.Right;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            while (!current.IsEmpty);
+
+            if (!current.IsEmpty && !current.Right.IsEmpty)
+            {
+                successor = Min(current.Right);
+            }
+
+            return successor;        }
+
+        internal static Option<(K, V)> TryFindOrSuccessor<OrdK, K, V>(MapItem<K, V> root, K key) where OrdK : struct, Ord<K>
+        {
+            Option<(K, V)> successor = None;
+            var current = root;
+
+            if (root.IsEmpty)
+            {
+                return None;
+            }
+
+            do
+            {
+                var cmp = default(OrdK).Compare(key, current.KeyValue.Key);
+                if (cmp < 0)
+                {
+                    successor = current.KeyValue;
+                    current = current.Left;
+                }
+                else if (cmp > 0)
+                {
+                    current = current.Right;
+                }
+                else
+                {
+                    return current.KeyValue;
+                }
+            }
+            while (!current.IsEmpty);
+
+            if (!current.IsEmpty && !current.Right.IsEmpty)
+            {
+                successor = Min(current.Right);
+            }
+
+            return successor;
+        }
     }
 }

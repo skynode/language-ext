@@ -5,7 +5,7 @@ using LanguageExt;
 using static LanguageExt.Prelude;
 using static LanguageExt.List;
 
-namespace LanguageExtTests
+namespace LanguageExt.Tests
 {
     public class ListTests
     {
@@ -260,6 +260,56 @@ namespace LanguageExtTests
             }));
         }
 
+        [Fact]
+        public void IterSimpleTest()
+        {
+            var embeddedSideEffectResult = 0;
+            var expression = from dummy in Some(unit)
+                from i in List(2, 3, 5)
+                let _ = fun(() => embeddedSideEffectResult += i)()
+                select i;
+
+            Assert.Equal(0, embeddedSideEffectResult);
+
+            var sideEffectByAction = 0;
+
+            expression.Iter(i => sideEffectByAction += i * i);
+            Assert.Equal(2 + 3 + 5, embeddedSideEffectResult);
+            Assert.Equal(2 * 2 + 3 * 3 + 5 * 5, sideEffectByAction);
+        }
+
+        [Fact]
+        public void IterPositionalTest()
+        {
+            var embeddedSideEffectResult = 0;
+            var expression = from dummy in Some(unit)
+                from i in List(2, 3, 5)
+                let _ = fun(() => embeddedSideEffectResult += i)()
+                select i;
+
+            Assert.Equal(0, embeddedSideEffectResult);
+
+            var sideEffectByAction = 0;
+
+            expression.Iter((pos, i) => sideEffectByAction += i * pos);
+            Assert.Equal(2 + 3 + 5, embeddedSideEffectResult);
+            Assert.Equal(2 * 0 + 3 * 1 + 5 * 2, sideEffectByAction);
+        }
+
+        [Fact]
+        public void ConsumeTest()
+        {
+            var embeddedSideEffectResult = 0;
+            System.Collections.Generic.IEnumerable<int> expression = from dummy in Some(unit)
+                from i in List(2, 3, 5)
+                let _ = fun(() => embeddedSideEffectResult += i)()
+                select i;
+
+            Assert.Equal(0, embeddedSideEffectResult);
+            expression.Consume();
+            Assert.Equal(2 + 3+ 5, embeddedSideEffectResult);
+        }
+        
         [Fact]
         public void SkipLastTest1()
         {

@@ -236,6 +236,38 @@ namespace LanguageExt
         public R Find<R>(K key, Func<V, R> Some, Func<R> None) => Value.Find(key, Some, None);
 
         /// <summary>
+        /// Retrieve the value from previous item to specified key
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key/value</returns>
+        [Pure]
+        public Option<(K Key, V Value)> FindPredecessor(K key) => Value.FindPredecessor(key);
+
+        /// <summary>
+        /// Retrieve the value from exact key, or if not found, the previous item 
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key/value</returns>
+        [Pure]
+        public Option<(K Key, V Value)> FindExactOrPredecessor(K key) => Value.FindOrPredecessor(key);
+
+        /// <summary>
+        /// Retrieve the value from next item to specified key
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key/value</returns>
+        [Pure]
+        public Option<(K Key, V Value)> FindSuccessor(K key) => Value.FindSuccessor(key);
+
+        /// <summary>
+        /// Retrieve the value from exact key, or if not found, the next item 
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key/value</returns>
+        [Pure]
+        public Option<(K Key, V Value)> FindExactOrSuccessor(K key) => Value.FindOrSuccessor(key);
+
+        /// <summary>
         /// Try to find the key in the map, if it doesn't exist, add a new 
         /// item by invoking the delegate provided.
         /// </summary>
@@ -382,6 +414,16 @@ namespace LanguageExt
         /// <returns>Range of values</returns>
         [Pure]
         public IEnumerable<V> FindRange(K keyFrom, K keyTo) => Value.FindRange(keyFrom, keyTo);
+
+        /// <summary>
+        /// Retrieve a range of values 
+        /// </summary>
+        /// <param name="keyFrom">Range start (inclusive)</param>
+        /// <param name="keyTo">Range to (inclusive)</param>
+        /// <exception cref="ArgumentNullException">Throws ArgumentNullException the keyFrom or keyTo are null</exception>
+        /// <returns>Range of values</returns>
+        [Pure]
+        public IEnumerable<(K Key, V Value)> FindRangePairs(K keyFrom, K keyTo) => Value.FindRangePairs(keyFrom, keyTo);
 
         /// <summary>
         /// Skips 'amount' values and returns a new tree without the 
@@ -1033,5 +1075,27 @@ namespace LanguageExt
         /// </summary>
         public static implicit operator Map<OrdK, K, V>(SeqEmpty _) =>
             Empty;
+
+        /// <summary>
+        /// Creates a new map from a range/slice of this map
+        /// </summary>
+        /// <param name="keyFrom">Range start (inclusive)</param>
+        /// <param name="keyTo">Range to (inclusive)</param>
+        /// <returns></returns>
+        [Pure]
+        public Map<OrdK, K, V> Slice(K keyFrom, K keyTo) =>
+            new Map<OrdK, K, V>(FindRangePairs(keyFrom, keyTo));
+
+        /// <summary>
+        /// Find the lowest ordered item in the map
+        /// </summary>
+        [Pure]
+        public Option<(K Key, V Value)> Min => Value.Min;
+
+        /// <summary>
+        /// Find the highest ordered item in the map
+        /// </summary>
+        [Pure]
+        public Option<(K Key, V Value)> Max => Value.Max;
     }
 }

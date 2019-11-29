@@ -1,7 +1,16 @@
-﻿using System;
+﻿////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                    //
+//                                                                                                    //
+//     NOTE: This is just my scratch pad for quickly testing stuff, not for human consumption         //
+//                                                                                                    //
+//                                                                                                    //
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+using System;
 using System.Linq;
 using System.Reflection;
 using LanguageExt;
+using LanguageExt.Common;
 using Newtonsoft.Json;
 using System.Runtime.Serialization;
 using static LanguageExt.Prelude;
@@ -31,12 +40,108 @@ public interface IRepository
     Task<Option<Gender>> GetGenderByIdAsync(Guid id);
 }
 
-
-
 class Program
 {
+    static void TestEquals<T>(T t1, T t2) =>
+    Console.WriteLine(t1.Equals(t2));
+
+    static void TestEqualityComparer<T>(T t1, T t2) =>
+        Console.WriteLine(EqualityComparer<T>.Default.Equals(t1, t2));
+
+    static void Issue663()
+    {
+        var i1 = Right(1);
+        var i2 = Right(1);
+        TestEquals(i1, i2);             // True
+        TestEqualityComparer(i1, i2);   // True
+
+        var a1 = new { x = 1 };
+        var a2 = new { x = 1 };
+        TestEquals(a1, a2);             // True
+        TestEqualityComparer(a1, a2);   // True
+
+        var r1 = Right(a1);
+        var r2 = Right(a2);
+        TestEquals(r1, r2);             // True
+        TestEqualityComparer(r1, r2);   // True
+    }
+
     static void Main(string[] args)
     {
+        Issue663();
+
+        Shape<TInt, int> sw = null;
+        Shape<TInt, int> sx = null;
+        var sy = Shape.Circle<TInt, int>(100);
+        var sz = Shape.Circle<TInt, int>(100);
+        var s2 = Shape.Circle<TInt, int>(200);
+
+        Debug.Assert((sw == sx) == true); // both null
+        Debug.Assert((sw == sy) == false); // left null
+        Debug.Assert((sy == sx) == false); // right null
+        Debug.Assert((sy == sz) == true); // both set
+        Debug.Assert((s2 == sz) == false); // left bigger
+        Debug.Assert((sz == s2) == false); // right bigger
+
+        Debug.Assert((sw > sx) == false); // both null
+        Debug.Assert((sw < sx) == false);
+        Debug.Assert((sw >= sx) == true);
+        Debug.Assert((sw <= sx) == true);
+
+        Debug.Assert((sw > sy) == false); // left null
+        Debug.Assert((sw < sy) == true);
+        Debug.Assert((sw >= sy) == false);
+        Debug.Assert((sw <= sy) == true);
+
+        Debug.Assert((sy > sw) == true); // right null
+        Debug.Assert((sy < sw) == false);
+        Debug.Assert((sy >= sw) == true);
+        Debug.Assert((sy <= sw) == false);
+
+        Debug.Assert((sy > sz) == false); // both same
+        Debug.Assert((sy < sz) == false);
+        Debug.Assert((sy >= sz) == true);
+        Debug.Assert((sy <= sz) == true);
+
+        Debug.Assert((s2 > sz) == true); // left bigger
+        Debug.Assert((s2 < sz) == false);
+        Debug.Assert((s2 >= sz) == true);
+        Debug.Assert((s2 <= sz) == false);
+
+        Debug.Assert((sz > s2) == false); // right bigger
+        Debug.Assert((sz < s2) == true);
+        Debug.Assert((sz >= s2) == false);
+        Debug.Assert((sz <= s2) == true);
+
+
+        var c1 = Shape.Circle<TInt, int>(100);
+        var c2 = Shape.Circle<TInt, int>(100);
+        var c3 = Shape.Circle<TInt, int>(10);
+        var r1 = Shape.Rectangle<TInt, int>(10, 10);
+
+        Debug.Assert(c2 > c3);
+
+        var chc1 = c1.GetHashCode();
+        var chc2 = c2.GetHashCode();
+
+        var isceq1 = c1 == c2;
+        var isceq2 = c2 == c3;
+        var iscreq1 = c1 == r1;
+
+
+        Issue634();
+
+        HashMapRemoveTest();
+        HashMapRemoveTest2();
+
+
+        TestSubs.Test();
+
+        SeqPerf.Broken1();
+        return;
+        HashMapPerf.Run();
+        SeqPerf.Run();
+
         Test533();
 
         IEnumerableOptionBindT_NotEnumerabled_NotEvaluated();
@@ -54,6 +159,9 @@ class Program
         var xyz = new TestWith("Paul", "Louth");
         var xyz2 = new TestWith2("Paul", "Louth");
         var xyz3 = new TestWith3<string>("Test", "Paul", "Louth");
+        var xyz4 = new TestWith4("", "", "", "");
+
+        //TestWith4.@new.Set
 
         xyz3 = xyz3.With(Value: "Another");
 
@@ -96,6 +204,96 @@ class Program
 
 
         Console.WriteLine("Coming soon");
+    }
+
+    static void Issue634()
+    {
+        var makeName =
+                     from _1  in Subsys.tell(Seq1("Started"))
+                     from x   in Subsys.ReadFromDB()
+                     from _2  in Subsys.tell(Seq1("Got from DB"))
+                     from g   in x.Forename == "Tom"
+                                  ? Subsys.Pure(unit)
+                                  : Subsys.Error<Unit>("Not Me!!", new Exception("NOT ME"))
+                     from y   in Subsys.put(x)
+                     from _3  in Subsys.tell(Seq1("Updated state"))
+                     from a   in Subsys.Forename
+                     from b   in Subsys.Surname
+                     from _4  in Subsys.tell(Seq1("Got name parts"))
+                     select $"{a} {b}";
+
+        var result = makeName.Run(new RealIO(), new Person("Foo", "Bar"));
+
+        Console.WriteLine("Logs:");
+        result.Output.Iter(x => Console.WriteLine(x));
+
+        Console.WriteLine("Name:");
+        result.Match(
+            Succ: x => Console.WriteLine(x),
+            Fail: x => Console.WriteLine(x.Message));
+
+        Console.ReadLine();
+    }
+
+    static void HashMapRemoveTest()
+    {
+        var rnd = new Random();
+        var tries = 1;
+        while(true)
+        {
+            var cnt = 1 + Math.Abs(rnd.Next() % 100000);
+
+            Console.WriteLine($"Try: {tries} - {cnt} items");
+
+            Seq<int> xs = default;
+            HashMap<int, int> hm = default;
+
+            for(var i = 0; i < cnt; i++)
+            {
+                var n = rnd.Next();
+                if(!hm.ContainsKey(n))
+                {
+                    hm = hm.Add(n, n);
+                    xs = xs.Add(n);
+                }
+            }
+
+            foreach(var x in xs)
+            {
+                hm = hm.Remove(x);
+                if(hm.ContainsKey(x))
+                {
+                    throw new Exception();
+                }
+
+                // Add something else to make sure add works after remove
+                if (Math.Abs(rnd.Next() % 1000) < 100)
+                {
+                    var n = rnd.Next();
+                    if (!hm.ContainsKey(n))
+                    {
+                        hm = hm.Add(n, n);
+                    }
+                }
+            }
+            tries++;
+        }
+    }
+
+    static void HashMapRemoveTest2()
+    {
+        var values = new[] { 9321519, 2085595311 };
+
+        var items = toHashMap(values.Zip(values));
+
+        foreach (var value in values.Take(values.Length - 1))
+        {
+            items = items.Remove(value);
+        }
+
+        items = items.Add(2085595311, 2085595311);
+        items = items.Remove(2085595311);
+
     }
 
     public static void Test533()
@@ -307,3 +505,64 @@ class Program
             x.GetHashCode();
     }
 }
+
+
+//public partial struct Subs<S, A>
+//{
+//    internal readonly LanguageExt.RWS<TInt, TestBed.IO, int, S, A> __comp;
+//    internal Subs(LanguageExt.RWS<TInt, TestBed.IO, int, S, A> comp) => __comp = comp;
+//    public static Subs<S, A> Pure(A value) => new Subs<S, A>((env, state) => (value, default, state, false));
+//    public static Subs<S, A> Fail => new Subs<S, A>((env, state) => (default, default, default, true));
+//    public Subs<S, B> Map<B>(Func<A, B> f) => new Subs<S, B>(__comp.Map(f));
+//    public Subs<S, B> Select<B>(Func<A, B> f) => new Subs<S, B>(__comp.Map(f));
+//    public Subs<S, B> Bind<B>(Func<A, Subs<S, B>> f) => new Subs<S, B>(__comp.Bind(a => f(a).__comp));
+//    public Subs<S, B> SelectMany<B>(Func<A, Subs<S, B>> f) => new Subs<S, B>(__comp.Bind(a => f(a).__comp));
+//    public Subs<S, C> SelectMany<B, C>(Func<A, Subs<S, B>> bind, Func<A, B, C> project) => new Subs<S, C>(__comp.Bind(a => bind(a).__comp.Map(b => project(a, b))));
+//    public (TryOption<A> Value, int Output, S State) Run(TestBed.IO env, S state) => __comp.Run(env, state);
+//    public Subs<S, A> Filter(Func<A, bool> f) => new Subs<S, A>(__comp.Where(f));
+//    public Subs<S, A> Where(Func<A, bool> f) => new Subs<S, A>(__comp.Where(f));
+//    public Subs<S, A> Do(Action<A> f) => new Subs<S, A>(__comp.Do(f));
+//    public Subs<S, A> Strict() => new Subs<S, A>(__comp.Strict());
+//    public Seq<A> ToSeq(TestBed.IO env, S state) => __comp.ToSeq(env, state);
+//    public Subs<S, LanguageExt.Unit> Iter(Action<A> f) => new Subs<S, LanguageExt.Unit>(__comp.Iter(f));
+//    public Func<TestBed.IO, S, State> Fold<State>(State state, Func<State, A, State> f)
+//    {
+//        var self = this;
+//        return (env, s) => self.__comp.Fold(state, f).Run(env, s).Value.IfNoneOrFail(state);
+//    }
+
+//    public Func<TestBed.IO, S, bool> ForAll(Func<A, bool> f)
+//    {
+//        var self = this;
+//        return (env, s) => self.__comp.ForAll(f).Run(env, s).Value.IfNoneOrFail(false);
+//    }
+
+//    public Func<TestBed.IO, S, bool> Exists(Func<A, bool> f)
+//    {
+//        var self = this;
+//        return (env, s) => self.__comp.Exists(f).Run(env, s).Value.IfNoneOrFail(false);
+//    }
+//    public Subs<S, A> Local(Func<TestBed.IO, TestBed.IO> f) =>
+//        new Subs<S, A>(LanguageExt.Prelude.local<TInt, TestBed.IO, int, S, A>(__comp, f));
+
+//    public Subs<S, (A, B)> Listen<B>(Func<int, B> f) => new Subs<S, (A, B)>(__comp.Listen(f));
+//    public Subs<S, A> Censor(Func<int, int> f) => new Subs<S, A>(__comp.Censor(f));
+//}
+
+//public static partial class Subs
+//{
+//    public static Subs<S, A> Pure<S, A>(A value) => Subs<S, A>.Pure(value);
+//    public static Subs<S, A> Fail<S, A>() => Subs<S, A>.Fail;
+//    public static Subs<S, A> asks<S, A>(Func<TestBed.IO, A> f) => new Subs<S, A>((env, state) => (f(env), default, state, false));
+//    public static Subs<S, TestBed.IO> ask<S>() => new Subs<S, TestBed.IO>((env, state) => (env, default, state, false));
+//    public static Subs<S, S> get<S>() => new Subs<S, S>((env, state) => (state, default, state, false));
+//    public static Subs<S, A> gets<S, A>(Func<S, A> f) => new Subs<S, A>((env, state) => (f(state), default, state, false));
+//    public static Subs<S, Unit> put<S>(S value) => new Subs<S, Unit>((env, state) => (default, default, value, false));
+//    public static Subs<S, Unit> modify<S>(Func<S, S> f) => new Subs<S, Unit>((env, state) => (default, default, f(state), false));
+//    public static Subs<S, A> local<S, A>(Subs<S, A> ma, Func<TestBed.IO, TestBed.IO> f) => ma.Local(f);
+//    public static Subs<S, A> Pass<S, A>(this Subs<S, (A, Func<int, int>)> ma) => new Subs<S, A>(ma.__comp.Pass());
+//    public static Subs<S, A> pass<S, A>(Subs<S, (A, Func<int, int>)> ma) => new Subs<S, A>(ma.__comp.Pass());
+//    public static Subs<S, (A, B)> listen<S, A, B>(Subs<S, A> ma, Func<int, B> f) => ma.Listen(f);
+//    public static Subs<S, A> censor<S, A>(Subs<S, A> ma, Func<int, int> f) => ma.Censor(f);
+//    public static Subs<S, Unit> tell<S, A>(int what) => new Subs<S, Unit>(tell<TInt, TestBed.IO, int, S, A>(what));
+//}

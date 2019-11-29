@@ -29,7 +29,7 @@ namespace LanguageExt
 
         readonly SetInternal<OrdDefault<A>, A> value;
 
-        SetInternal<OrdDefault<A>, A> Value => value ?? Empty.Value;
+        internal SetInternal<OrdDefault<A>, A> Value => value ?? Empty.Value;
 
         /// <summary>
         /// Ctor from an enumerable 
@@ -180,6 +180,48 @@ namespace LanguageExt
         [Pure]
         public Option<A> Find(A value) =>
             Value.Find(value);
+
+        /// <summary>
+        /// Retrieve a range of values 
+        /// </summary>
+        /// <param name="keyFrom">Range start (inclusive)</param>
+        /// <param name="keyTo">Range to (inclusive)</param>
+        /// <exception cref="ArgumentNullException">Throws ArgumentNullException the keyFrom or keyTo are null</exception>
+        /// <returns>Range of values</returns>
+        [Pure]
+        public IEnumerable<A> FindRange(A keyFrom, A keyTo) => Value.FindRange(keyFrom, keyTo);
+
+        /// <summary>
+        /// Retrieve the value from previous item to specified key
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<A> FindPredecessor(A key) => Value.FindPredecessor(key);
+
+        /// <summary>
+        /// Retrieve the value from exact key, or if not found, the previous item 
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<A> FindExactOrPredecessor(A key) => Value.FindOrPredecessor(key);
+
+        /// <summary>
+        /// Retrieve the value from next item to specified key
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<A> FindSuccessor(A key) => Value.FindSuccessor(key);
+
+        /// <summary>
+        /// Retrieve the value from exact key, or if not found, the next item 
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<A> FindExactOrSuccessor(A key) => Value.FindOrSuccessor(key);
 
         /// <summary>
         /// Returns the elements that are in both this and other
@@ -599,7 +641,30 @@ namespace LanguageExt
         /// <summary>
         /// Implicit conversion from an untyped empty list
         /// </summary>
+        [Pure]
         public static implicit operator Set<A>(SeqEmpty _) =>
             Empty;
+
+        /// <summary>
+        /// Creates a new map from a range/slice of this map
+        /// </summary>
+        /// <param name="keyFrom">Range start (inclusive)</param>
+        /// <param name="keyTo">Range to (inclusive)</param>
+        /// <returns></returns>
+        [Pure]
+        public Set<A> Slice(A keyFrom, A keyTo) =>
+            new Set<A>(FindRange(keyFrom, keyTo));
+
+        /// <summary>
+        /// Find the lowest ordered item in the set
+        /// </summary>
+        [Pure]
+        public Option<A> Min => Value.Min;
+
+        /// <summary>
+        /// Find the highest ordered item in the set
+        /// </summary>
+        [Pure]
+        public Option<A> Max => Value.Max;
     }
 }

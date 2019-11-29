@@ -15,6 +15,14 @@ namespace LanguageExt.Parsec
     /// </summary>
     public static class Prim
     {
+        static Prim()
+        {
+            unitp = inp => EmptyOK(unit, inp);
+            getPos = (PString inp) => ConsumedOK(inp.Pos, inp);
+            getIndex = (PString inp) => ConsumedOK(inp.Index, inp);
+            eof = notFollowedBy(satisfy(_ => true)).label("end of input");
+        }
+
         /// <summary>
         /// Run the parser p with the input provided
         /// </summary>
@@ -38,8 +46,7 @@ namespace LanguageExt.Parsec
         /// makes it easier to put breakpoints on the actual first parser
         /// in an expression.  It returns unit
         /// </summary>
-        public static Parser<Unit> unitp =>
-            inp => EmptyOK(unit, inp);
+        public static readonly Parser<Unit> unitp;
 
         /// <summary>
         /// Special parser for setting user-state that propagates 
@@ -64,14 +71,12 @@ namespace LanguageExt.Parsec
         /// Get the current position of the parser in the source as a line
         /// and column index (starting at 1 for both)
         /// </summary>
-        public static readonly Parser<Pos> getPos =
-            (PString inp) => ConsumedOK(inp.Pos, inp);
+        public static readonly Parser<Pos> getPos;
 
         /// <summary>
         /// Get the current index into the source
         /// </summary>
-        public static readonly Parser<int> getIndex =
-            (PString inp) => ConsumedOK(inp.Index, inp);
+        public static readonly Parser<int> getIndex;
 
         /// <summary>
         /// The parser unexpected(msg) always fails with an Unexpect error
@@ -393,49 +398,52 @@ namespace LanguageExt.Parsec
         /// Enumerable of the returned values of p.
         /// </returns>
         public static Parser<Seq<T>> manyn0<T>(Parser<T> p, int n) =>
-            inp =>
-            {
-                var current = inp;
-                var results = new List<T>();
-                ParserError error = null;
-
-                int count = 0;
-
-                while (true)
+            n <= 0 
+                ? result(Seq<T>.Empty)
+                : inp =>
                 {
-                    var t = p(current);
-                    count++;
+                    var current = inp;
+                    var results = new List<T>();
+                    ParserError error = null;
 
-                    // cok
-                    if (t.Tag == ResultTag.Consumed && t.Reply.Tag == ReplyTag.OK)
+                    int count = 0;
+
+                    while (true)
                     {
-                        results.Add(t.Reply.Result);
-                        current = t.Reply.State;
-                        error = t.Reply.Error;
-                        if (count == n)
+                        var t = p(current);
+                        count++;
+
+                        // cok
+                        if (t.Tag == ResultTag.Consumed && t.Reply.Tag == ReplyTag.OK)
                         {
-                            return EmptyOK(Seq(results), current, mergeError(error, t.Reply.Error));
+                            results.Add(t.Reply.Result);
+                            current = t.Reply.State;
+                            error = t.Reply.Error;
+                            if (count == n)
+                            {
+                                return EmptyOK(Seq(results), current, mergeError(error, t.Reply.Error));
+                            }
+
+                            continue;
                         }
-                        continue;
-                    }
 
-                    // eok
-                    if (t.Tag == ResultTag.Empty && t.Reply.Tag == ReplyTag.OK)
-                    {
-                        // eok, eerr
-                        return EmptyError<Seq<T>>(new ParserError(ParserErrorTag.SysUnexpect, current.Pos, "many: combinator 'manyn' is applied to a parser that accepts an empty string.", List.empty<string>()));
-                    }
+                        // eok
+                        if (t.Tag == ResultTag.Empty && t.Reply.Tag == ReplyTag.OK)
+                        {
+                            // eok, eerr
+                            return EmptyError<Seq<T>>(new ParserError(ParserErrorTag.SysUnexpect, current.Pos, "many: combinator 'manyn' is applied to a parser that accepts an empty string.", List.empty<string>()));
+                        }
 
-                    // cerr
-                    if (t.Tag == ResultTag.Consumed && t.Reply.Tag == ReplyTag.Error)
-                    {
-                        return ConsumedError<Seq<T>>(mergeError(error, t.Reply.Error));
-                    }
+                        // cerr
+                        if (t.Tag == ResultTag.Consumed && t.Reply.Tag == ReplyTag.Error)
+                        {
+                            return ConsumedError<Seq<T>>(mergeError(error, t.Reply.Error));
+                        }
 
-                    // eerr
-                    return EmptyOK(Seq(results), current, mergeError(error, t.Reply.Error));
-                }
-            };
+                        // eerr
+                        return EmptyOK(Seq(results), current, mergeError(error, t.Reply.Error));
+                    }
+                };
 
         /// <summary>
         /// manyn1(p) applies the parser p one or up to a maximum of n times.
@@ -706,8 +714,7 @@ namespace LanguageExt.Parsec
         /// This parser only succeeds at the end of the input. This is not a
         /// primitive parser but it is defined using 'notFollowedBy'.
         /// </summary>
-        public readonly static Parser<Unit> eof =
-            notFollowedBy(anyChar).label("end of input");
+        public readonly static Parser<Unit> eof;
 
         /// <summary>
         /// notFollowedBy(p) only succeeds when parser p fails. This parser

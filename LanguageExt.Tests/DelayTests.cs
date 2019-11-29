@@ -7,7 +7,7 @@ using System.Threading;
 
 using Xunit;
 
-namespace LanguageExtTests
+namespace LanguageExt.Tests
 {
     public class DelayTests
     {
@@ -27,7 +27,7 @@ namespace LanguageExtTests
                 Thread.Sleep(10);
             }
 
-            while (DateTime.Now < till.AddMilliseconds(100))
+            while (DateTime.Now < till.AddMilliseconds(200))
             {
                 Thread.Sleep(10);
             }

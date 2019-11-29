@@ -35,7 +35,7 @@ namespace LanguageExt.Tests
             finally
             {
                 var elapsed = w.ElapsedMilliseconds;
-                Assert.True(Math.Abs(elapsed - milliseconds) < 150, $"Supposed to complete in {milliseconds}ms.  It took {elapsed}ms. " + thing);
+                Assert.True(Math.Abs(elapsed - milliseconds) < (milliseconds / 10), $"Supposed to complete in {milliseconds}ms.  It took {elapsed}ms. " + thing);
             }
         }
 
@@ -338,7 +338,7 @@ namespace LanguageExt.Tests
 
             var res = AsyncHelper.CompletesImmediately(() =>
                 from a in ma
-                from b in mb.ToTry()
+                from b in mb.ToTry(None: () => 0)
                 select a + b);
 
             var ab = await AsyncHelper.TakesRoughly(2000, () => res.IfFail(0));

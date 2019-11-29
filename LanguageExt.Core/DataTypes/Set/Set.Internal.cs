@@ -99,6 +99,18 @@ namespace LanguageExt
         public int Count =>
             set.Count;
 
+        [Pure]
+        public Option<A> Min => 
+            set.IsEmpty
+                ? None
+                : SetModule.Min(set);
+
+        [Pure]
+        public Option<A> Max =>
+            set.IsEmpty
+                ? None
+                : SetModule.Max(set);
+
         /// <summary>
         /// Add an item to the set
         /// </summary>
@@ -209,6 +221,56 @@ namespace LanguageExt
         [Pure]
         public Option<A> Find(A value) =>
             SetModule.TryFind<OrdA, A>(set, value);
+
+        /// <summary>
+        /// Retrieve the value from predecessor item to specified key
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<A> FindPredecessor(A key) => SetModule.TryFindPredecessor<OrdA, A>(set, key);
+
+        /// <summary>
+        /// Retrieve the value from exact key, or if not found, the predecessor item 
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<A> FindOrPredecessor(A key) => SetModule.TryFindOrPredecessor<OrdA, A>(set, key);
+
+        /// <summary>
+        /// Retrieve the value from next item to specified key
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<A> FindSuccessor(A key) => SetModule.TryFindSuccessor<OrdA, A>(set, key);
+
+        /// <summary>
+        /// Retrieve the value from exact key, or if not found, the next item 
+        /// </summary>
+        /// <param name="key">Key to find</param>
+        /// <returns>Found key</returns>
+        [Pure]
+        public Option<A> FindOrSuccessor(A key) => SetModule.TryFindOrSuccessor<OrdA, A>(set, key);
+
+        /// <summary>
+        /// Retrieve a range of values 
+        /// </summary>
+        /// <param name="keyFrom">Range start (inclusive)</param>
+        /// <param name="keyTo">Range to (inclusive)</param>
+        /// <exception cref="ArgumentNullException">Throws ArgumentNullException the keyFrom or keyTo are null</exception>
+        /// <returns>Range of values</returns>
+        [Pure]
+        public IEnumerable<A> FindRange(A keyFrom, A keyTo)
+        {
+            if (isnull(keyFrom)) throw new ArgumentNullException(nameof(keyFrom));
+            if (isnull(keyTo)) throw new ArgumentNullException(nameof(keyTo));
+            return default(OrdA).Compare(keyFrom, keyTo) > 0
+                ? SetModule.FindRange<OrdA, A>(set, keyTo, keyFrom)
+                : SetModule.FindRange<OrdA, A>(set, keyFrom, keyTo);
+        }
+
 
         /// <summary>
         /// Returns the elements that are in both this and other
@@ -1195,11 +1257,174 @@ namespace LanguageExt
                 ? SetItem<B>.Empty
                 : new SetItem<B>(node.Height, node.Count, f(node.Key), Map(node.Left, f), Map(node.Right, f));
 
+        internal static Option<A> Max<A>(SetItem<A> node) =>
+            node.Right.IsEmpty
+                ? node.Key
+                : Max(node.Right);
+
+        internal static Option<A> Min<A>(SetItem<A> node) =>
+            node.Left.IsEmpty
+                ? node.Key
+                : Min(node.Left);
+
+        internal static Option<A> TryFindPredecessor<OrdA, A>(SetItem<A> root, A key) where OrdA : struct, Ord<A>
+        {
+            Option<A> predecessor = None;
+            var current = root;
+
+            if (root.IsEmpty)
+            {
+                return None;
+            }
+
+            do
+            {
+                var cmp = default(OrdA).Compare(key, current.Key);
+                if (cmp < 0)
+                {
+                    current = current.Left;
+                }
+                else if (cmp > 0)
+                {
+                    predecessor = current.Key;
+                    current = current.Right;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            while (!current.IsEmpty);
+
+            if(!current.IsEmpty && !current.Left.IsEmpty)
+            {
+                predecessor = Max(current.Left);
+            }
+
+            return predecessor;
+        }
+
+        internal static Option<A> TryFindOrPredecessor<OrdA, A>(SetItem<A> root, A key) where OrdA : struct, Ord<A>
+        {
+            Option<A> predecessor = None;
+            var current = root;
+
+            if (root.IsEmpty)
+            {
+                return None;
+            }
+
+            do
+            {
+                var cmp = default(OrdA).Compare(key, current.Key);
+                if (cmp < 0)
+                {
+                    current = current.Left;
+                }
+                else if (cmp > 0)
+                {
+                    predecessor = current.Key;
+                    current = current.Right;
+                }
+                else
+                {
+                    return current.Key;
+                }
+            }
+            while (!current.IsEmpty);
+
+            if (!current.IsEmpty && !current.Left.IsEmpty)
+            {
+                predecessor = Max(current.Left);
+            }
+
+            return predecessor;
+        }
+
+        internal static Option<A> TryFindSuccessor<OrdA, A>(SetItem<A> root, A key) where OrdA : struct, Ord<A>
+        {
+            Option<A> successor = None;
+            var current = root;
+
+            if (root.IsEmpty)
+            {
+                return None;
+            }
+
+            do
+            {
+                var cmp = default(OrdA).Compare(key, current.Key);
+                if (cmp < 0)
+                {
+                    successor = current.Key;
+                    current = current.Left;
+                }
+                else if (cmp > 0)
+                {
+                    current = current.Right;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            while (!current.IsEmpty);
+
+            if (!current.IsEmpty && !current.Right.IsEmpty)
+            {
+                successor = Min(current.Right);
+            }
+
+            return successor;
+        }
+
+        internal static Option<A> TryFindOrSuccessor<OrdA, A>(SetItem<A> root, A key) where OrdA : struct, Ord<A>
+        {
+            Option<A> successor = None;
+            var current = root;
+
+            if (root.IsEmpty)
+            {
+                return None;
+            }
+
+            do
+            {
+                var cmp = default(OrdA).Compare(key, current.Key);
+                if (cmp < 0)
+                {
+                    successor = current.Key;
+                    current = current.Left;
+                }
+                else if (cmp > 0)
+                {
+                    current = current.Right;
+                }
+                else
+                {
+                    return current.Key;
+                }
+            }
+            while (!current.IsEmpty);
+
+            if (!current.IsEmpty && !current.Right.IsEmpty)
+            {
+                successor = Min(current.Right);
+            }
+
+            return successor;
+        }
+
         public class SetEnumerator<K> : IEnumerator<K>
         {
-            static ObjectPool<Stack<SetItem<K>>> pool = new ObjectPool<Stack<SetItem<K>>>(32, () => new Stack<SetItem<K>>(32));
+            internal struct NewStack : New<SetItem<K>[]>
+            {
+                public SetItem<K>[] New() =>
+                    new SetItem<K>[32];
+            }
 
-            Stack<SetItem<K>> stack;
+            int stackDepth;
+            SetItem<K>[] stack;
             readonly SetItem<K> map;
             int left;
             readonly bool rev;
@@ -1210,7 +1435,7 @@ namespace LanguageExt
                 this.rev = rev;
                 this.start = start;
                 map = root;
-                stack = pool.GetItem();
+                stack = Pool<NewStack, SetItem<K>[]>.Pop();
                 Reset();
             }
 
@@ -1227,7 +1452,7 @@ namespace LanguageExt
             {
                 if (stack != null)
                 {
-                    pool.Release(stack);
+                    Pool<NewStack, SetItem<K>[]>.Push(stack);
                     stack = null;
                 }
             }
@@ -1242,16 +1467,18 @@ namespace LanguageExt
             {
                 while (!node.IsEmpty)
                 {
-                    stack.Push(node);
+                    stack[stackDepth] = node;
+                    stackDepth++;
                     node = Prev(node);
                 }
             }
 
             public bool MoveNext()
             {
-                if (left > 0 && stack.Count > 0)
+                if (left > 0 && stackDepth > 0)
                 {
-                    NodeCurrent = stack.Pop();
+                    stackDepth--;
+                    NodeCurrent = stack[stackDepth];
                     Push(Next(NodeCurrent));
                     left--;
                     return true;
@@ -1265,7 +1492,7 @@ namespace LanguageExt
             {
                 var skip = rev ? map.Count - start - 1 : start;
 
-                stack.Clear();
+                stackDepth = 0;
                 NodeCurrent = map;
                 left = map.Count;
 
@@ -1273,7 +1500,8 @@ namespace LanguageExt
                 {
                     if (skip < Prev(NodeCurrent).Count)
                     {
-                        stack.Push(NodeCurrent);
+                        stack[stackDepth] = NodeCurrent;
+                        stackDepth++;
                         NodeCurrent = Prev(NodeCurrent);
                     }
                     else
@@ -1285,7 +1513,8 @@ namespace LanguageExt
 
                 if (!NodeCurrent.IsEmpty)
                 {
-                    stack.Push(NodeCurrent);
+                    stack[stackDepth] = NodeCurrent;
+                    stackDepth++;
                 }
             }
         }

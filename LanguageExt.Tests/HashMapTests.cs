@@ -7,7 +7,7 @@ using System;
 using System.Linq;
 using LanguageExt.ClassInstances;
 
-namespace LanguageExtTests
+namespace LanguageExt.Tests
 {
     public class HashMapTests
     {
@@ -186,8 +186,7 @@ namespace LanguageExtTests
         {
             int max = 100000;
 
-            var items = LanguageExt.List.map(Range(1, max), _ => Tuple(Guid.NewGuid(), Guid.NewGuid()))
-                                        .ToDictionary(kv => kv.Item1, kv => kv.Item2);
+            var items = Range(1, max).Map( _ => (Key: Guid.NewGuid(), Value: Guid.NewGuid())).ToSeq();
 
             var m = HashMap<Guid, Guid>().AddRange(items);
             Assert.True(m.Count == max);
@@ -227,6 +226,44 @@ namespace LanguageExtTests
             Assert.True(HashMap<int, int>((1, 2), (3, 4)).Equals(HashMap<int, int>((1, 2), (3, 4))));
             Assert.True(HashMap<int, int>((3, 4), (1, 2)).Equals(HashMap<int, int>((1, 2), (3, 4))));
             Assert.True(HashMap<int, int>((3, 4), (1, 2)).Equals(HashMap<int, int>((3, 4), (1, 2))));
+        }
+        
+        [Fact]
+        public void FetchBack()
+        {
+            var init = Seq(69, 1477);
+            var rmv = Seq1(69);
+
+            var map = toHashMap(init.Zip(Enumerable.Repeat(1, int.MaxValue)));
+
+            Assert.True(map.ContainsKey(1477)); // false
+            Assert.True(map.Find(1477).IsSome); // false
+
+
+            var minus = map.RemoveRange(rmv);
+
+            Assert.True(minus.Keys.Find(i => i == 1477).IsSome); // true
+            
+            Assert.True(minus.ContainsKey(1477)); // false
+            Assert.True(minus.Find(1477).IsSome); // false
+
+            var boom = minus[1477]; // throws
+        }
+
+        [Fact]
+        public void HashMapRemoveTest()
+        {
+            var values = new[] { 1175691501, 613261927, 178639586, 745392133,
+                                 1071314707, 464997766, 746033505, 2055266377,
+                                 9321519, 2085595311 };
+
+            var items = toHashMap(values.Zip(values));
+
+            foreach(var value in values)
+            {
+                items = items.Remove(value);
+                Assert.True(!items.Contains(value));
+            }
         }
     }
 }
